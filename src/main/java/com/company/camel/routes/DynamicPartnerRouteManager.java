@@ -82,27 +82,8 @@ public class DynamicPartnerRouteManager {
         // Get all existing partner configurations
         Map<String, PartnerConfigurationService.PartnerConfig> allConfigs = partnerConfigService.getAllPartnerConfigs();
         
-        // Create a listener implementation
-        ElasticsearchPartnerConfigService.ConfigurationChangeListener listener = 
-            new ElasticsearchPartnerConfigService.ConfigurationChangeListener() {
-                @Override
-                public void onConfigurationChanged(String businessUnit, ElasticsearchPartnerConfigService.PartnerConfig newConfig) {
-                    // Convert ElasticsearchPartnerConfigService.PartnerConfig to PartnerConfigurationService.PartnerConfig
-                    // For now, trigger a reload from the PartnerConfigurationService
-                    PartnerConfigurationService.PartnerConfig config = partnerConfigService.getPartnerConfig(businessUnit);
-                    DynamicPartnerRouteManager.this.onConfigurationChanged(businessUnit, config);
-                }
-                
-                @Override
-                public void onConfigurationDeleted(String businessUnit) {
-                    DynamicPartnerRouteManager.this.onConfigurationDeleted(businessUnit);
-                }
-            };
-        
-        for (String partnerId : allConfigs.keySet()) {
-            elasticsearchConfigService.addConfigurationChangeListener(partnerId, listener);
-            log.debug("📋 Registered configuration listener for partner: {}", partnerId);
-        }
+        // Note: Configuration change listeners are handled via API webhook calls
+        // No need to register listeners with ElasticsearchPartnerConfigService
         
         log.info("✅ Registered configuration change listeners for {} partners", allConfigs.size());
     }

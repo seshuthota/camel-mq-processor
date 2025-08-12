@@ -208,6 +208,11 @@ public class PartnerConfigurationService {
         private boolean metricsEnabled = true;
         @lombok.Builder.Default
         private boolean alertingEnabled = true;
+        
+        // Convenience method to get queue name
+        public String getQueueName() {
+            return "partner." + businessUnit + ".queue";
+        }
     }
 
     /**

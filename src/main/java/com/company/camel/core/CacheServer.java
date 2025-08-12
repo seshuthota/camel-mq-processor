@@ -34,6 +34,8 @@ public class CacheServer {
 
     // Static for global token management across all instances
     public static ConcurrentHashMap<String, String> tokenMap = new ConcurrentHashMap<>();
+    
+    public static ConcurrentHashMap<String, String> refreshTokenMap = new ConcurrentHashMap<>();
 
     public static ConcurrentHashMap<String, LocalDateTime> tokenGenerationTimeMap = new ConcurrentHashMap<>();
 }

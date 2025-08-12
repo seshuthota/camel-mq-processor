@@ -175,6 +175,22 @@ public class CacheClientHandler {
     }
     
     /**
+     * NEW: Get refresh token for a partner
+     */
+    public String getRefreshToken(String businessUnit) {
+        return CacheServer.refreshTokenMap.get(businessUnit);
+    }
+    
+    /**
+     * NEW: Store token with expiry tracking
+     */
+    public void storeToken(String businessUnit, String token, int expiryMinutes) {
+        CacheServer.tokenMap.put(businessUnit, token);
+        CacheServer.tokenGenerationTimeMap.put(businessUnit, LocalDateTime.now());
+        log.debug("🔐 Token stored for partner: {} (expires in {} minutes)", businessUnit, expiryMinutes);
+    }
+    
+    /**
      * NEW: Get cache statistics for monitoring
      */
     public CacheStats getCacheStats() {

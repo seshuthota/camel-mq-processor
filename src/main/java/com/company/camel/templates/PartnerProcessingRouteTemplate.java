@@ -1,6 +1,6 @@
 package com.company.camel.templates;
 
-import com.company.camel.config.ElasticsearchPartnerConfigService;
+import com.company.camel.config.PartnerConfigurationService;
 import com.company.camel.core.CacheClientHandler;
 import com.company.camel.monitoring.PartnerCircuitBreakerManager;
 import com.company.camel.monitoring.PartnerThreadPoolManager;
@@ -47,7 +47,7 @@ public class PartnerProcessingRouteTemplate extends RouteBuilder {
     private CacheClientHandler cacheClientHandler;
     
     @Autowired
-    private ElasticsearchPartnerConfigService configService;
+    private PartnerConfigurationService configService;
 
     @Override
     public void configure() throws Exception {
@@ -60,100 +60,17 @@ public class PartnerProcessingRouteTemplate extends RouteBuilder {
             .templateParameter("durable", "true")
             .templateParameter("autoDelete", "false")
             
-            // Partner-specific exception handling
-            .onException(Exception.class)
-                .handled(true)
-                .setHeader("ErrorMessage", simple("${exception.message}"))
-                .setHeader("ErrorTimestamp", simple("${date:now:yyyy-MM-dd HH:mm:ss}"))
-                .setHeader("PartnerId", simple("{{partnerId}}"))
-                .process(exchange -> {
-                    String partnerId = exchange.getIn().getHeader("PartnerId", String.class);
-                    String errorMsg = exchange.getIn().getHeader("ErrorMessage", String.class);
-                    
-                    log.error("💥 Partner {} processing error: {}", partnerId, errorMsg);
-                    
-                    exchange.getIn().setHeader("ProcessingStage", "PartnerSpecificProcessing");
-                    exchange.getIn().setHeader("RouteId", "Partner:" + partnerId);
-                })
-                .log(LoggingLevel.ERROR, "Partner ${headers.PartnerId} Error: ${headers.ErrorMessage}")
-                .to("direct:elasticExceptionStore.{{partnerId}}")
-                .end()
-            
             // Main partner processing route
             .from("rabbitmq:{{queueName}}?autoDelete={{autoDelete}}&durable={{durable}}&concurrentConsumers={{concurrentConsumers}}")
                 .routeId("Partner:{{partnerId}}:Processing")
                 .log(LoggingLevel.INFO, "📨 Processing message for partner: {{partnerId}}")
                 .setHeader("PartnerId", constant("{{partnerId}}"))
                 .process(new PartnerConfigLoader())
-                .to("direct:partnerHeaderDecryption.{{partnerId}}")
-                .to("direct:partnerAuthentication.{{partnerId}}")
-                .to("direct:partnerMessageTransmission.{{partnerId}}")
-                .to("direct:partnerResultLogging.{{partnerId}}")
-                .log(LoggingLevel.INFO, "✅ Message processing completed for partner: {{partnerId}}")
-            
-            // Partner-specific header decryption
-            .from("direct:partnerHeaderDecryption.{{partnerId}}")
-                .routeId("Partner:{{partnerId}}:HeaderDecryption")
-                .log(LoggingLevel.DEBUG, "🔐 Header decryption for partner: {{partnerId}}")
                 .process(new PartnerHeaderDecryptionProcessor())
-                .log(LoggingLevel.DEBUG, "✅ Header decryption completed for partner: {{partnerId}}")
-            
-            // Partner-specific authentication
-            .from("direct:partnerAuthentication.{{partnerId}}")
-                .routeId("Partner:{{partnerId}}:Authentication")
-                .log(LoggingLevel.DEBUG, "🔑 Authentication check for partner: {{partnerId}}")
                 .process(new PartnerAuthenticationProcessor())
-                .choice()
-                    .when(header("TokenExpired").isEqualTo(true))
-                        .log(LoggingLevel.INFO, "🔄 Token expired for {{partnerId}}, refreshing...")
-                        .to("direct:partnerOAuthRefresh.{{partnerId}}")
-                    .otherwise()
-                        .log(LoggingLevel.DEBUG, "✅ Token valid for {{partnerId}}")
-                .end()
-            
-            // Partner-specific OAuth refresh
-            .from("direct:partnerOAuthRefresh.{{partnerId}}")
-                .routeId("Partner:{{partnerId}}:OAuthRefresh")
-                .log(LoggingLevel.INFO, "🔄 OAuth token refresh for partner: {{partnerId}}")
-                .process(new PartnerOAuthRefreshProcessor())
-                .log(LoggingLevel.INFO, "✅ OAuth token refreshed for partner: {{partnerId}}")
-            
-            // Partner-specific message transmission
-            .from("direct:partnerMessageTransmission.{{partnerId}}")
-                .routeId("Partner:{{partnerId}}:MessageTransmission")
-                .log(LoggingLevel.INFO, "📤 Message transmission for partner: {{partnerId}}")
                 .process(new PartnerMessageTransmissionProcessor())
-                .log(LoggingLevel.INFO, "✅ Message transmission completed for partner: {{partnerId}}")
-            
-            // Partner-specific result logging
-            .from("direct:partnerResultLogging.{{partnerId}}")
-                .routeId("Partner:{{partnerId}}:ResultLogging")
-                .log(LoggingLevel.DEBUG, "📊 Result logging for partner: {{partnerId}}")
                 .process(new PartnerResultLoggingProcessor())
-                .to("direct:elasticResultStore.{{partnerId}}")
-                .log(LoggingLevel.DEBUG, "✅ Result logging completed for partner: {{partnerId}}")
-            
-            // Partner-specific Elasticsearch result storage
-            .from("direct:elasticResultStore.{{partnerId}}")
-                .routeId("Partner:{{partnerId}}:ElasticResultStore")
-                .log(LoggingLevel.DEBUG, "📚 Storing result for partner: {{partnerId}}")
-                .setHeader(Exchange.HTTP_METHOD, constant("POST"))
-                .setHeader(Exchange.CONTENT_TYPE, constant("application/json"))
-                .setHeader(Exchange.HTTP_URI, simple("http://localhost:9200/partner-{{partnerId}}-results/_doc"))
-                .marshal().json()
-                .to("http://dummy") // Will be replaced with actual Elasticsearch endpoint
-                .log(LoggingLevel.DEBUG, "✅ Result stored for partner: {{partnerId}}")
-            
-            // Partner-specific Elasticsearch exception storage
-            .from("direct:elasticExceptionStore.{{partnerId}}")
-                .routeId("Partner:{{partnerId}}:ElasticExceptionStore")
-                .log(LoggingLevel.DEBUG, "📚 Storing exception for partner: {{partnerId}}")
-                .setHeader(Exchange.HTTP_METHOD, constant("POST"))
-                .setHeader(Exchange.CONTENT_TYPE, constant("application/json"))
-                .setHeader(Exchange.HTTP_URI, simple("http://localhost:9200/partner-{{partnerId}}-exceptions/_doc"))
-                .marshal().json()
-                .to("http://dummy") // Will be replaced with actual Elasticsearch endpoint
-                .log(LoggingLevel.DEBUG, "✅ Exception stored for partner: {{partnerId}}");
+                .log(LoggingLevel.INFO, "✅ Message processing completed for partner: {{partnerId}}");
     }
 
     /**
@@ -169,7 +86,7 @@ public class PartnerProcessingRouteTemplate extends RouteBuilder {
             }
             
             // Load partner configuration from Elasticsearch
-            ElasticsearchPartnerConfigService.PartnerConfig config = configService.getPartnerConfig(partnerId);
+            PartnerConfigurationService.PartnerConfig config = configService.getPartnerConfig(partnerId);
             exchange.getIn().setHeader("PartnerConfig", config);
             
             log.debug("✅ Configuration loaded for partner: {}", partnerId);
@@ -205,8 +122,8 @@ public class PartnerProcessingRouteTemplate extends RouteBuilder {
         @Override
         public void process(Exchange exchange) throws Exception {
             String partnerId = exchange.getIn().getHeader("PartnerId", String.class);
-            ElasticsearchPartnerConfigService.PartnerConfig config = 
-                (ElasticsearchPartnerConfigService.PartnerConfig) exchange.getIn().getHeader("PartnerConfig");
+            PartnerConfigurationService.PartnerConfig config = 
+                (PartnerConfigurationService.PartnerConfig) exchange.getIn().getHeader("PartnerConfig");
             
             CompletableFuture<Void> future = circuitBreakerManager.executeWithCircuitBreaker(partnerId, () -> {
                 // Check partner-specific token
@@ -234,20 +151,20 @@ public class PartnerProcessingRouteTemplate extends RouteBuilder {
         @Override
         public void process(Exchange exchange) throws Exception {
             String partnerId = exchange.getIn().getHeader("PartnerId", String.class);
-            ElasticsearchPartnerConfigService.PartnerConfig config = 
-                (ElasticsearchPartnerConfigService.PartnerConfig) exchange.getIn().getHeader("PartnerConfig");
+            PartnerConfigurationService.PartnerConfig config = 
+                (PartnerConfigurationService.PartnerConfig) exchange.getIn().getHeader("PartnerConfig");
             
             CompletableFuture<Void> future = circuitBreakerManager.executeWithCircuitBreaker(partnerId, () -> {
                 // Partner-specific OAuth refresh logic
                 String authEndpoint = config.getAuthEndpoint();
-                String refreshToken = CacheClientHandler.getRefreshToken(partnerId);
+                String refreshToken = cacheClientHandler.getRefreshToken(partnerId);
                 
                 // Simulate OAuth refresh call
                 log.info("🔄 Refreshing OAuth token for partner: {} using endpoint: {}", partnerId, authEndpoint);
                 
                 // In real implementation, make HTTP call to partner's auth endpoint
                 String newToken = "new_token_" + partnerId + "_" + System.currentTimeMillis();
-                CacheClientHandler.storeToken(partnerId, newToken, config.getAuthTokenExpiryMinutes());
+                cacheClientHandler.storeToken(partnerId, newToken, config.getAuthTokenExpiryMinutes());
                 
                 exchange.getIn().setHeader("NewToken", newToken);
                 exchange.getIn().setHeader("TokenRefreshed", true);
@@ -266,8 +183,8 @@ public class PartnerProcessingRouteTemplate extends RouteBuilder {
         @Override
         public void process(Exchange exchange) throws Exception {
             String partnerId = exchange.getIn().getHeader("PartnerId", String.class);
-            ElasticsearchPartnerConfigService.PartnerConfig config = 
-                (ElasticsearchPartnerConfigService.PartnerConfig) exchange.getIn().getHeader("PartnerConfig");
+            PartnerConfigurationService.PartnerConfig config = 
+                (PartnerConfigurationService.PartnerConfig) exchange.getIn().getHeader("PartnerConfig");
             
             CompletableFuture<Void> future = threadPoolManager.executePartnerTask(partnerId, () -> {
                 // Partner-specific message transmission with retry logic
@@ -312,7 +229,7 @@ public class PartnerProcessingRouteTemplate extends RouteBuilder {
             future.get();
         }
         
-        private void simulatePartnerApiCall(String partnerId, ElasticsearchPartnerConfigService.PartnerConfig config) throws Exception {
+        private void simulatePartnerApiCall(String partnerId, PartnerConfigurationService.PartnerConfig config) throws Exception {
             // Partner-specific API simulation
             String apiEndpoint = config.getApiEndpoint();
             int timeoutSeconds = config.getApiTimeoutSeconds();
