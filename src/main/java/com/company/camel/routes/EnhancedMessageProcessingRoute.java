@@ -15,19 +15,25 @@ import org.springframework.stereotype.Component;
 import java.util.concurrent.CompletableFuture;
 
 /**
- * ENHANCED MESSAGE PROCESSING ROUTE 🚀
+ * ENHANCED MESSAGE PROCESSING ROUTE 🚀 (LEGACY)
  * 
- * This is the main message processing pipeline with:
+ * This is the LEGACY shared message processing pipeline with:
  * - Thread isolation per partner
  * - Circuit breaker protection
  * - Asynchronous processing
  * - Retry mechanisms with exponential backoff
  * - Comprehensive error handling
  * 
- * NO MORE BLOCKING! NO MORE CASCADING FAILURES! 💪
+ * ⚠️ DEPRECATED: Use PartnerProcessingRouteTemplate for new partner-specific routes
+ * This route is disabled by default. Enable with app.routes.legacy.enabled=true
  */
 @Slf4j
 @Component
+@org.springframework.boot.autoconfigure.condition.ConditionalOnProperty(
+    name = "app.routes.legacy.enabled", 
+    havingValue = "true", 
+    matchIfMissing = false
+)
 public class EnhancedMessageProcessingRoute extends RouteBuilder {
 
     @Autowired

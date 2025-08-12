@@ -1,0 +1,105 @@
+{
+  "mappings": {
+    "properties": {
+      "businessUnit": {
+        "type": "keyword"
+      },
+      "enabled": {
+        "type": "boolean"
+      },
+      "queueConfig": {
+        "properties": {
+          "queueName": {
+            "type": "keyword"
+          },
+          "concurrentConsumers": {
+            "type": "integer"
+          },
+          "durable": {
+            "type": "boolean"
+          },
+          "autoDelete": {
+            "type": "boolean"
+          }
+        }
+      },
+      "threadPoolConfig": {
+        "properties": {
+          "coreThreads": {
+            "type": "integer"
+          },
+          "maxThreads": {
+            "type": "integer"
+          },
+          "queueCapacity": {
+            "type": "integer"
+          },
+          "keepAliveSeconds": {
+            "type": "long"
+          }
+        }
+      },
+      "circuitBreakerConfig": {
+        "properties": {
+          "failureThreshold": {
+            "type": "float"
+          },
+          "minCalls": {
+            "type": "integer"
+          },
+          "waitDuration": {
+            "type": "integer"
+          }
+        }
+      },
+      "retryConfig": {
+        "properties": {
+          "maxAttempts": {
+            "type": "integer"
+          },
+          "backoffMultiplier": {
+            "type": "double"
+          },
+          "initialDelayMs": {
+            "type": "long"
+          }
+        }
+      },
+      "authConfig": {
+        "properties": {
+          "tokenExpiryMinutes": {
+            "type": "integer"
+          },
+          "authEndpoint": {
+            "type": "keyword"
+          },
+          "authMethod": {
+            "type": "keyword"
+          }
+        }
+      },
+      "apiConfig": {
+        "properties": {
+          "timeoutSeconds": {
+            "type": "integer"
+          },
+          "endpoint": {
+            "type": "keyword"
+          },
+          "maxConcurrentCalls": {
+            "type": "integer"
+          }
+        }
+      },
+      "priority": {
+        "type": "keyword"
+      },
+      "lastModified": {
+        "type": "date"
+      },
+      "version": {
+        "type": "long"
+      }
+    }
+  }
+}

@@ -22,9 +22,6 @@ import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
 
 /**
  * ELASTICSEARCH PARTNER CONFIGURATION SERVICE 🔍
@@ -48,11 +45,7 @@ public class ElasticsearchPartnerConfigService {
     @Value("${spring.elasticsearch.password:elastic123}")
     private String password;
     
-    @Value("${app.partners.config-refresh-interval:300s}")
-    private String refreshInterval;
-
     private ElasticsearchClient elasticsearchClient;
-    private ScheduledExecutorService scheduler;
     private final PartnerConfigurationService configService;
     private final ObjectMapper objectMapper;
 
@@ -74,8 +67,7 @@ public class ElasticsearchPartnerConfigService {
             // Load initial configurations
             loadPartnerConfigurations();
             
-            // Schedule periodic refresh
-            scheduleConfigRefresh();
+            // Note: Configuration refresh is now handled by API webhook calls
             
             log.info("✅ Elasticsearch Partner Config Service initialized successfully");
             
@@ -184,44 +176,21 @@ public class ElasticsearchPartnerConfigService {
         }
     }
 
-    private void scheduleConfigRefresh() {
-        scheduler = Executors.newSingleThreadScheduledExecutor(r -> {
-            Thread t = new Thread(r, "elasticsearch-config-refresh");
-            t.setDaemon(true);
-            return t;
-        });
-
-        // Parse refresh interval (e.g., "300s" -> 300 seconds)
-        long intervalSeconds = parseIntervalToSeconds(refreshInterval);
-        
-        scheduler.scheduleAtFixedRate(() -> {
-            try {
-                log.debug("🔄 Refreshing partner configurations from Elasticsearch...");
-                loadPartnerConfigurations();
-            } catch (Exception e) {
-                log.error("💥 Failed to refresh partner configurations: {}", e.getMessage());
-            }
-        }, intervalSeconds, intervalSeconds, TimeUnit.SECONDS);
-        
-        log.info("⏰ Scheduled config refresh every {} seconds", intervalSeconds);
-    }
-
-    private long parseIntervalToSeconds(String interval) {
+    /**
+     * Manually reload configurations from Elasticsearch
+     * Called by API webhook when configurations change
+     */
+    public void reloadConfigurations() {
         try {
-            if (interval.endsWith("s")) {
-                return Long.parseLong(interval.substring(0, interval.length() - 1));
-            } else if (interval.endsWith("m")) {
-                return Long.parseLong(interval.substring(0, interval.length() - 1)) * 60;
-            } else if (interval.endsWith("h")) {
-                return Long.parseLong(interval.substring(0, interval.length() - 1)) * 3600;
-            } else {
-                return Long.parseLong(interval);
-            }
+            log.info("🔄 Manually reloading partner configurations from Elasticsearch...");
+            loadPartnerConfigurations();
+            log.info("✅ Partner configurations reloaded successfully");
         } catch (Exception e) {
-            log.warn("⚠️ Failed to parse refresh interval '{}', using default 300s", interval);
-            return 300;
+            log.error("💥 Failed to reload partner configurations: {}", e.getMessage(), e);
+            throw new RuntimeException("Failed to reload configurations", e);
         }
     }
+
 
     // Helper methods for safe type conversion
     private int getIntValue(Map<String, Object> source, String key, int defaultValue) {
@@ -281,18 +250,6 @@ public class ElasticsearchPartnerConfigService {
     @PreDestroy
     public void shutdown() {
         log.info("🛑 Shutting down Elasticsearch Partner Config Service...");
-        
-        if (scheduler != null && !scheduler.isShutdown()) {
-            scheduler.shutdown();
-            try {
-                if (!scheduler.awaitTermination(10, TimeUnit.SECONDS)) {
-                    scheduler.shutdownNow();
-                }
-            } catch (InterruptedException e) {
-                scheduler.shutdownNow();
-                Thread.currentThread().interrupt();
-            }
-        }
         
         if (elasticsearchClient != null) {
             try {

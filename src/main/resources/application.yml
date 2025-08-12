@@ -35,6 +35,14 @@ spring:
       channel:
         size: 100
 
+  # Elasticsearch Configuration
+  elasticsearch:
+    uris: ${ELASTICSEARCH_URIS:http://localhost:9200}
+    username: ${ELASTICSEARCH_USERNAME:elastic}
+    password: ${ELASTICSEARCH_PASSWORD:elastic123}
+    connection-timeout: 30s
+    socket-timeout: 30s
+
 # Camel Configuration
 camel:
   springboot:
@@ -124,6 +132,21 @@ app:
     # Will be loaded from Elasticsearch
     load-from-elastic: true
     default-consumer-count: 10
+    config-refresh-interval: 300s
+    
+  # Partner-specific Configuration
+  partner-config:
+    index: partner-configurations
+    refresh-interval-seconds: 30
+    enable-dynamic-routes: true
+    
+  # Route Template Configuration  
+  routes:
+    templates:
+      enabled: true
+      partner-processing-template: partnerProcessingTemplate
+    legacy:
+      enabled: false  # Disable old shared route
   
   # Monitoring
   monitoring:
